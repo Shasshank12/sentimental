@@ -1,0 +1,104 @@
+# SentimentalAI Dashboard Configuration
+
+# Dashboard Settings
+dashboard:
+  title: "SentimentalAI"
+  subtitle: "Real-time Sentiment Analysis with AI-Powered Insights"
+  theme: "enterprise"
+  layout: "wide"
+  sidebar_state: "expanded"
+
+# Analysis Settings
+analysis:
+  default_tweet_count: 100
+  min_tweets: 10
+  max_tweets: 200
+  cache_duration: 3600 # 1 hour
+  refresh_interval: 30 # 30 seconds
+
+# Model Settings
+model:
+  file_path: "best_enhanced_sentiment_model.pkl"
+  preprocessing:
+    remove_urls: true
+    remove_mentions: true
+    remove_hashtags: true
+    remove_emojis: true
+    lemmatize: true
+    remove_stopwords: true
+
+# Chart Settings
+charts:
+  sentiment_pie:
+    height: 400
+    colors:
+      positive: "#28a745"
+      negative: "#dc3545"
+      neutral: "#6c757d"
+
+  timeline:
+    height: 400
+    time_range: 24 # hours
+    update_interval: 60 # seconds
+
+# AI Chat Settings
+chat:
+  max_history: 10
+  auto_clear: true
+  placeholder: "Ask about your sentiment data..."
+  examples:
+    - "Is our reputation taking a hit?"
+    - "What are the key trends?"
+    - "How should we respond to this crisis?"
+    - "What's the overall sentiment?"
+    - "Are there any emerging issues?"
+
+# UI Settings
+ui:
+  animations: true
+  hover_effects: true
+  responsive: true
+  dark_mode: false
+
+  colors:
+    primary: "#667eea"
+    secondary: "#764ba2"
+    success: "#28a745"
+    warning: "#ffc107"
+    danger: "#dc3545"
+    info: "#17a2b8"
+    light: "#f8f9fa"
+    dark: "#343a40"
+
+# Performance Settings
+performance:
+  enable_caching: true
+  cache_ttl: 3600
+  lazy_loading: true
+  compression: true
+
+# Logging Settings
+logging:
+  level: "INFO"
+  file: "dashboard.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# API Settings (for future Twitter API integration)
+api:
+  twitter:
+    enabled: false
+    rate_limit: 100
+    timeout: 30
+
+  openai:
+    enabled: false
+    model: "gpt-3.5-turbo"
+    max_tokens: 150
+
+# Export Settings
+export:
+  formats: ["csv", "json", "pdf"]
+  include_charts: true
+  include_insights: true
+  filename_template: "sentiment_intelligence_{query}_{timestamp}"
