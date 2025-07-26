@@ -1,40 +1,31 @@
-# Start from slim Python base image
+# Start from a base Python image
 FROM python:3.10-slim
 
-# Install system dependencies for spacy, pandas, lxml, etc.
+# Install system dependencies including git and Rust (for tokenizers)
 RUN apt-get update && apt-get install -y \
+    git \
     curl \
     build-essential \
-    gcc \
-    libffi-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    libjpeg-dev \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust (for tokenizers and maturin)
+# Install Rust (needed for some packages)
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first (for Docker cache)
+# Copy and install Python dependencies
 COPY requirements.txt .
-
-# Upgrade pip and install dependencies
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Download spaCy model (ensures it's present in container)
+# Download spaCy model
 RUN python -m spacy download en_core_web_sm
 
-# Copy project files
+# Copy the rest of the project
 COPY . .
 
-# Expose port 10000 (used by Render)
+# Expose port and run app
 EXPOSE 10000
-
-# Start FastAPI app with uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
