@@ -1,8 +1,14 @@
-__pycache__
+# Ignore Python cache and venv
+__pycache__/
 *.pyc
-*.pyo
-*.pyd
 venv/
-.env
-.DS_Store
+.venv/
+
+# Ignore node stuff
+node_modules/
 .next/
+
+# Ignore system files
+.DS_Store
+*.log
+.env
