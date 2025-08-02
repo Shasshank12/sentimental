@@ -1,5 +1,6 @@
 const path = require('path');
-console.log("WEBPACK ALIAS RESOLVING TO:", path.resolve(process.cwd(), 'lib'));
+
+console.log("WEBPACK ALIAS RESOLVING TO:", path.resolve(process.cwd()));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -12,7 +13,8 @@ const nextConfig = {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://sentimental-ai-vvo0.onrender.com',
   },
   webpack: (config) => {
-    config.resolve.alias['@'] = path.resolve(process.cwd(), 'lib');
+    // FIX: Alias '@' to the ROOT directory
+    config.resolve.alias['@'] = path.resolve(process.cwd());  // NOT lib
     return config;
   },
 };
