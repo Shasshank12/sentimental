@@ -1,3 +1,5 @@
+import path from 'path';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -8,6 +10,14 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+  },
+  env: {
+    NEXT_PUBLIC_API_BASE_URL:
+      process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000',
+  },
+  webpack(config) {
+    config.resolve.alias['@'] = path.resolve(__dirname);
+    return config;
   },
 }
 
