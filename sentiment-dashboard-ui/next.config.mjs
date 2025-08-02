@@ -15,7 +15,8 @@ const nextConfig = {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://sentimental-ai-vvo0.onrender.com',
   },
   webpack: (config) => {
-    config.resolve.alias['@'] = path.resolve(__dirname);
+    // FIX: Alias '@' to the 'lib' folder inside your project
+    config.resolve.alias['@'] = path.resolve(__dirname, 'lib');
     return config;
   },
 };
