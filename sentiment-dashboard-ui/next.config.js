@@ -1,4 +1,5 @@
 const path = require('path');
+console.log("WEBPACK ALIAS RESOLVING TO:", path.resolve(process.cwd(), 'lib'));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
