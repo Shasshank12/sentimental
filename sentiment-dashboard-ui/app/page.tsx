@@ -583,59 +583,96 @@ export default function Dashboard() {
                   </Card>
                 )}
 
-                {/* Charts */}
-                <div className="flex justify-center">
-                <Card className="bg-white border-gray-200 shadow-lg w-full p-6">
-
-                    <CardHeader className="w-full flex flex-col items-center justify-center">
-                      <CardTitle className="flex items-center gap-2 text-gray-900 justify-center w-full">
-                        <BarChart3 className="w-5 h-5" />
-                        Sentiment Distribution
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="w-full h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsPieChart>
-                            <Pie
-                              data={getChartData()}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {getChartData().map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value) => (typeof value === 'number' ? `${value.toFixed(1)}%` : value)} />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="flex flex-col items-center gap-2 text-sm text-gray-700">
-                        <div className="flex items-center gap-2">
-                          <span className="bg-red-500 text-white px-2 py-0.5 rounded animate-pulse text-xs font-semibold">LIVE</span>
-                          <span className="text-xs text-gray-500">{analysisResults?.sample_tweets?.length || 0} items fetched just now</span>
+                {/* Charts Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Sentiment Timeline Chart */}
+                  {getTimelineData().length > 0 && (
+                    <Card className="bg-white border-gray-200 shadow-lg">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-gray-900">
+                          <TrendingUp className="w-5 h-5" />
+                          Sentiment Over Time
+                        </CardTitle>
+                        <CardDescription className="text-gray-600">
+                          How sentiment is distributed across recent days
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="w-full h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RechartsLineChart data={getTimelineData()}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#6b7280" />
+                              <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" domain={[0, 100]} />
+                              <Tooltip
+                                formatter={(value: number) => `${value}%`}
+                                contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                              />
+                              <Legend />
+                              <Line type="monotone" dataKey="positive" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981' }} name="Positive" />
+                              <Line type="monotone" dataKey="negative" stroke="#EF4444" strokeWidth={2} dot={{ fill: '#EF4444' }} name="Negative" />
+                              <Line type="monotone" dataKey="neutral" stroke="#3B82F6" strokeWidth={2} dot={{ fill: '#3B82F6' }} name="Neutral" />
+                            </RechartsLineChart>
+                          </ResponsiveContainer>
                         </div>
-                        {topSources.length > 0 && (
-  <div className="text-xs text-gray-700 mt-2">
-    <span className="font-semibold text-gray-900 block mb-1">Top Sources:</span>
-    <div className="flex flex-wrap items-center gap-4">
-      {topSources.map(([source, count]) => (
-        <span key={source} className="whitespace-nowrap">
-          {source}: {count}
-        </span>
-      ))}
-    </div>
-  </div>
-)}
-                        <div className="text-xs text-gray-400">Last updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Source Breakdown Chart */}
+                  {getSourceSentimentBarData().length > 0 && (
+                    <Card className="bg-white border-gray-200 shadow-lg">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-gray-900">
+                          <BarChart3 className="w-5 h-5" />
+                          Sentiment by Source
+                        </CardTitle>
+                        <CardDescription className="text-gray-600">
+                          Compare sentiment across different platforms
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="w-full h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RechartsBarChart data={getSourceSentimentBarData()} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12 }} stroke="#6b7280" />
+                              <YAxis type="category" dataKey="source" tick={{ fontSize: 12 }} stroke="#6b7280" width={80} />
+                              <Tooltip
+                                formatter={(value: number) => `${value.toFixed(1)}%`}
+                                contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                              />
+                              <Legend />
+                              <Bar dataKey="positive" stackId="a" fill="#10B981" name="Positive" />
+                              <Bar dataKey="neutral" stackId="a" fill="#3B82F6" name="Neutral" />
+                              <Bar dataKey="negative" stackId="a" fill="#EF4444" name="Negative" />
+                            </RechartsBarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Live Status Bar */}
+                <div className="flex items-center justify-center gap-4 py-4">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-red-500 text-white px-3 py-1 rounded-full animate-pulse text-xs font-semibold">LIVE</span>
+                    <span className="text-sm text-gray-600">{analysisResults?.sample_tweets?.length || 0} items analyzed</span>
+                  </div>
+                  <span className="text-gray-300">|</span>
+                  {topSources.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="font-medium">Sources:</span>
+                      {topSources.slice(0, 3).map(([source, count]) => (
+                        <span key={source} className="px-2 py-0.5 bg-gray-100 rounded text-xs">
+                          {source} ({count})
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <span className="text-gray-300">|</span>
+                  <span className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
 
                 {/* AI Assistant */}

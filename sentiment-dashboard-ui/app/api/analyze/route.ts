@@ -13,7 +13,10 @@ const POSITIVE_WORDS = new Set([
   'innovative', 'breakthrough', 'revolutionary', 'impressive', 'promising',
   'successful', 'winning', 'triumph', 'victory', 'achievement', 'progress',
   'growth', 'opportunity', 'potential', 'optimistic', 'confident', 'strong',
-  'robust', 'thriving', 'flourishing', 'booming', 'surging', 'soaring'
+  'robust', 'thriving', 'flourishing', 'booming', 'surging', 'soaring',
+  'viral', 'trending', 'hilarious', 'funny', 'cute', 'adorable', 'wholesome',
+  'epic', 'legendary', 'iconic', 'insane', 'fire', 'lit', 'goat', 'based',
+  'peak', 'chef', 'kiss', 'masterpiece', 'perfection', 'elite', 'top'
 ])
 
 const NEGATIVE_WORDS = new Set([
@@ -25,11 +28,13 @@ const NEGATIVE_WORDS = new Set([
   'collapse', 'plunge', 'slump', 'recession', 'downturn', 'loss', 'deficit',
   'struggling', 'suffering', 'painful', 'disappointing', 'frustrating',
   'annoying', 'irritating', 'outrage', 'scandal', 'controversy', 'backlash',
-  'criticism', 'complaint', 'lawsuit', 'investigation', 'fraud', 'scam'
+  'criticism', 'complaint', 'lawsuit', 'investigation', 'fraud', 'scam',
+  'cringe', 'mid', 'flop', 'ratio', 'dead', 'dying', 'worst', 'trash',
+  'garbage', 'toxic', 'cancelled', 'exposed', 'caught', 'fake', 'scam'
 ])
 
-const INTENSIFIERS = new Set(['very', 'extremely', 'incredibly', 'absolutely', 'totally', 'completely', 'highly', 'really'])
-const NEGATORS = new Set(['not', 'no', 'never', 'neither', 'nobody', 'nothing', 'nowhere', "don't", "doesn't", "didn't", "won't", "wouldn't", "can't", "couldn't"])
+const INTENSIFIERS = new Set(['very', 'extremely', 'incredibly', 'absolutely', 'totally', 'completely', 'highly', 'really', 'super', 'ultra', 'mega', 'so'])
+const NEGATORS = new Set(['not', 'no', 'never', 'neither', 'nobody', 'nothing', 'nowhere', "don't", "doesn't", "didn't", "won't", "wouldn't", "can't", "couldn't", "isn't", "aren't"])
 
 interface SentimentResult {
   label: 'positive' | 'negative' | 'neutral'
@@ -90,7 +95,7 @@ function analyzeSentiment(text: string): SentimentResult {
 }
 
 // ============================================================================
-// DATA FETCHING - Real data from multiple free public sources
+// DATA FETCHING - Real data from multiple sources
 // ============================================================================
 
 interface DataItem {
@@ -107,72 +112,88 @@ interface DataItem {
 // Helper to clean HTML and normalize text
 function cleanText(text: string): string {
   if (!text) return ''
-  // Remove HTML tags
   let cleaned = text.replace(/<[^>]*>/g, '')
-  // Remove extra whitespace
   cleaned = cleaned.replace(/\s+/g, ' ').trim()
-  // Remove special characters but keep basic punctuation
   cleaned = cleaned.replace(/[^\w\s.,!?'-]/g, '')
   return cleaned
 }
 
-// Fetch from Reddit (free, no API key needed)
-async function fetchRedditData(query: string, maxItems: number = 30): Promise<DataItem[]> {
-  const subreddits = ['technology', 'news', 'worldnews', 'science', 'programming']
+// Fetch from Reddit with multiple subreddits and better error handling
+async function fetchRedditData(query: string, maxItems: number = 50): Promise<DataItem[]> {
   const results: DataItem[] = []
 
   try {
-    // General search
-    const response = await fetch(
-      `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=hot&t=week&limit=${maxItems}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; SentimentalAI/1.0; +https://sentimental.app)'
+    // Search across Reddit - sort by new/hot for recent content
+    const searches = [
+      `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&t=day&limit=${Math.ceil(maxItems/2)}`,
+      `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=hot&t=week&limit=${Math.ceil(maxItems/2)}`
+    ]
+
+    for (const searchUrl of searches) {
+      try {
+        const response = await fetch(searchUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+          },
+          next: { revalidate: 60 } // Cache for 1 minute
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const posts = data.data?.children || []
+
+          for (const post of posts) {
+            const postData = post.data
+            if (!postData) continue
+
+            const text = cleanText(postData.title + ' ' + (postData.selftext || ''))
+
+            if (text.length > 20) {
+              const sentiment = analyzeSentiment(text)
+              results.push({
+                text: text.substring(0, 500),
+                sentiment: sentiment.label,
+                platform: 'reddit',
+                source: `r/${postData.subreddit}`,
+                created_at: new Date(postData.created_utc * 1000).toISOString(),
+                url: `https://reddit.com${postData.permalink}`,
+                title: postData.title,
+                score: postData.score
+              })
+            }
+          }
         }
-      }
-    )
-
-    if (response.ok) {
-      const data = await response.json()
-      const posts = data.data?.children || []
-
-      for (const post of posts) {
-        const postData = post.data
-        const text = cleanText(postData.title + ' ' + (postData.selftext || ''))
-
-        if (text.length > 20) {
-          const sentiment = analyzeSentiment(text)
-          results.push({
-            text: text.substring(0, 500),
-            sentiment: sentiment.label,
-            platform: 'reddit',
-            source: `r/${postData.subreddit}`,
-            created_at: new Date(postData.created_utc * 1000).toISOString(),
-            url: `https://reddit.com${postData.permalink}`,
-            title: postData.title,
-            score: postData.score
-          })
-        }
+      } catch (e) {
+        console.log('Reddit search failed:', e)
       }
     }
   } catch (error) {
     console.error('Reddit fetch error:', error)
   }
 
-  return results
+  // Remove duplicates by URL
+  const seen = new Set()
+  return results.filter(item => {
+    if (seen.has(item.url)) return false
+    seen.add(item.url)
+    return true
+  })
 }
 
-// Fetch from HackerNews (free Algolia API)
+// Fetch from HackerNews - search recent stories
 async function fetchHackerNewsData(query: string, maxItems: number = 30): Promise<DataItem[]> {
   const results: DataItem[] = []
 
   try {
+    // Use search_by_date for recent content
     const response = await fetch(
-      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=${maxItems}`,
+      `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=${maxItems}`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; SentimentalAI/1.0)'
-        }
+        },
+        next: { revalidate: 60 }
       }
     )
 
@@ -190,7 +211,7 @@ async function fetchHackerNewsData(query: string, maxItems: number = 30): Promis
             sentiment: sentiment.label,
             platform: 'hackernews',
             source: 'Hacker News',
-            created_at: new Date(hit.created_at_i * 1000).toISOString(),
+            created_at: hit.created_at || new Date().toISOString(),
             url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
             title: hit.title,
             score: hit.points
@@ -208,7 +229,7 @@ async function fetchHackerNewsData(query: string, maxItems: number = 30): Promis
 // Fetch from NewsAPI (with API key from env)
 async function fetchNewsAPIData(query: string, maxItems: number = 30): Promise<DataItem[]> {
   const results: DataItem[] = []
-  const apiKey = process.env.NEWSAPI_KEY || process.env.NEXT_PUBLIC_NEWSAPI_KEY
+  const apiKey = process.env.NEWSAPI_KEY
 
   if (!apiKey) {
     console.log('NewsAPI key not configured, skipping...')
@@ -221,7 +242,8 @@ async function fetchNewsAPIData(query: string, maxItems: number = 30): Promise<D
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; SentimentalAI/1.0)'
-        }
+        },
+        next: { revalidate: 300 } // Cache for 5 minutes
       }
     )
 
@@ -253,24 +275,87 @@ async function fetchNewsAPIData(query: string, maxItems: number = 30): Promise<D
   return results
 }
 
-// Fetch from GitHub (free, no API key needed for basic search)
-async function fetchGitHubData(query: string, maxItems: number = 20): Promise<DataItem[]> {
+// Fetch from Google News RSS (free, no API key needed)
+async function fetchGoogleNewsData(query: string, maxItems: number = 20): Promise<DataItem[]> {
   const results: DataItem[] = []
 
-  // Only fetch GitHub for tech-related queries
-  const techKeywords = ['tech', 'software', 'programming', 'ai', 'machine learning', 'technology', 'code', 'developer', 'api', 'framework', 'library']
+  try {
+    // Google News RSS feed
+    const response = await fetch(
+      `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; SentimentalAI/1.0)'
+        },
+        next: { revalidate: 300 }
+      }
+    )
+
+    if (response.ok) {
+      const xmlText = await response.text()
+
+      // Simple XML parsing for RSS items
+      const itemRegex = /<item>([\s\S]*?)<\/item>/g
+      const titleRegex = /<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/
+      const linkRegex = /<link>(.*?)<\/link>/
+      const pubDateRegex = /<pubDate>(.*?)<\/pubDate>/
+      const sourceRegex = /<source.*?>(.*?)<\/source>/
+
+      let match
+      let count = 0
+      while ((match = itemRegex.exec(xmlText)) !== null && count < maxItems) {
+        const item = match[1]
+        const titleMatch = item.match(titleRegex)
+        const linkMatch = item.match(linkRegex)
+        const pubDateMatch = item.match(pubDateRegex)
+        const sourceMatch = item.match(sourceRegex)
+
+        const title = titleMatch ? (titleMatch[1] || titleMatch[2] || '') : ''
+        const link = linkMatch ? linkMatch[1] : ''
+        const pubDate = pubDateMatch ? pubDateMatch[1] : new Date().toISOString()
+        const source = sourceMatch ? sourceMatch[1] : 'Google News'
+
+        if (title && title.length > 10) {
+          const text = cleanText(title)
+          const sentiment = analyzeSentiment(text)
+          results.push({
+            text: text.substring(0, 500),
+            sentiment: sentiment.label,
+            platform: 'news',
+            source: source,
+            created_at: new Date(pubDate).toISOString(),
+            url: link,
+            title: title
+          })
+          count++
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Google News fetch error:', error)
+  }
+
+  return results
+}
+
+// Fetch from GitHub (free, for tech-related queries)
+async function fetchGitHubData(query: string, maxItems: number = 15): Promise<DataItem[]> {
+  const results: DataItem[] = []
+
+  const techKeywords = ['tech', 'software', 'programming', 'ai', 'machine learning', 'technology', 'code', 'developer', 'api', 'framework', 'library', 'open source', 'github']
   const isTechy = techKeywords.some(kw => query.toLowerCase().includes(kw))
 
   if (!isTechy) return results
 
   try {
     const response = await fetch(
-      `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${maxItems}`,
+      `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${maxItems}`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; SentimentalAI/1.0)',
           'Accept': 'application/vnd.github.v3+json'
-        }
+        },
+        next: { revalidate: 300 }
       }
     )
 
@@ -288,7 +373,7 @@ async function fetchGitHubData(query: string, maxItems: number = 20): Promise<Da
             sentiment: sentiment.label,
             platform: 'github',
             source: 'GitHub',
-            created_at: repo.updated_at || new Date().toISOString(),
+            created_at: repo.pushed_at || repo.updated_at || new Date().toISOString(),
             url: repo.html_url,
             title: repo.full_name,
             score: repo.stargazers_count
@@ -301,57 +386,6 @@ async function fetchGitHubData(query: string, maxItems: number = 20): Promise<Da
   }
 
   return results
-}
-
-// ============================================================================
-// AI RESPONSE GENERATION - Context-aware responses without external API
-// ============================================================================
-
-function generateAIResponse(
-  query: string,
-  positivePercentage: number,
-  negativePercentage: number,
-  neutralPercentage: number,
-  totalItems: number,
-  topSources: string[]
-): string {
-  const dominantSentiment = positivePercentage > negativePercentage
-    ? (positivePercentage > neutralPercentage ? 'positive' : 'neutral')
-    : (negativePercentage > neutralPercentage ? 'negative' : 'neutral')
-
-  let analysis = ''
-
-  if (dominantSentiment === 'positive') {
-    analysis = `The sentiment around "${query}" is predominantly positive (${positivePercentage}%). `
-    if (positivePercentage > 70) {
-      analysis += `This indicates strong favorable opinions and enthusiasm in the community. `
-    } else if (positivePercentage > 50) {
-      analysis += `While generally positive, there's still a mix of perspectives being shared. `
-    }
-  } else if (dominantSentiment === 'negative') {
-    analysis = `The sentiment around "${query}" leans negative (${negativePercentage}%). `
-    if (negativePercentage > 70) {
-      analysis += `There appears to be significant concern or criticism being expressed. `
-    } else if (negativePercentage > 50) {
-      analysis += `The community shows mixed reactions with notable concerns. `
-    }
-  } else {
-    analysis = `The sentiment around "${query}" is relatively balanced (${neutralPercentage}% neutral). `
-    analysis += `This suggests the topic is being discussed factually or opinions are mixed. `
-  }
-
-  analysis += `Based on ${totalItems} items from ${topSources.slice(0, 3).join(', ')}. `
-
-  // Add insights based on the data
-  if (positivePercentage > 60 && negativePercentage < 20) {
-    analysis += `This is a favorable time for engagement with this topic.`
-  } else if (negativePercentage > 60) {
-    analysis += `Consider monitoring for potential issues or crises.`
-  } else {
-    analysis += `The balanced sentiment suggests ongoing debate and diverse viewpoints.`
-  }
-
-  return analysis
 }
 
 // ============================================================================
@@ -373,19 +407,20 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Starting analysis for query: "${query}"`)
 
     // Fetch data from all sources in parallel
-    const [redditData, hnData, newsData, githubData] = await Promise.all([
-      fetchRedditData(query, 30),
-      fetchHackerNewsData(query, 25),
-      fetchNewsAPIData(query, 20),
+    const [redditData, hnData, newsData, googleNewsData, githubData] = await Promise.all([
+      fetchRedditData(query, 50),
+      fetchHackerNewsData(query, 30),
+      fetchNewsAPIData(query, 25),
+      fetchGoogleNewsData(query, 20),
       fetchGitHubData(query, 15)
     ])
 
     // Combine all data
-    let allData: DataItem[] = [...redditData, ...hnData, ...newsData, ...githubData]
+    let allData: DataItem[] = [...redditData, ...hnData, ...newsData, ...googleNewsData, ...githubData]
 
-    console.log(`📊 Data collected: Reddit=${redditData.length}, HN=${hnData.length}, News=${newsData.length}, GitHub=${githubData.length}`)
+    console.log(`📊 Data collected: Reddit=${redditData.length}, HN=${hnData.length}, NewsAPI=${newsData.length}, GoogleNews=${googleNewsData.length}, GitHub=${githubData.length}`)
 
-    // If no real data, return error (don't fall back to mock)
+    // If no real data, return error
     if (allData.length === 0) {
       return NextResponse.json({
         total_tweets: 0,
@@ -398,7 +433,7 @@ export async function POST(request: NextRequest) {
         source_sentiment_counts: {},
         success: false,
         message: `No data found for "${query}". Try a different search term.`,
-        ai_answer: `I couldn't find any recent data about "${query}". This might be because:\n\n1. The topic is very niche\n2. The search term needs to be more specific\n3. There's limited recent discussion on this topic\n\nTry searching for a broader or more popular topic.`
+        ai_answer: `I couldn't find any recent data about "${query}". This might be because the topic is very niche or there's limited recent discussion. Try a broader or more popular topic.`
       })
     }
 
@@ -430,60 +465,54 @@ export async function POST(request: NextRequest) {
       sourceSentimentCounts[platform][item.sentiment]++
     }
 
-    // Calculate timeline (group by hour)
+    // Calculate timeline (group by day for better visualization)
     const now = new Date()
-    const timelineBuckets: Record<number, DataItem[]> = {}
+    const timelineBuckets: Record<string, DataItem[]> = {}
 
     for (const item of allData) {
       const itemDate = new Date(item.created_at)
-      const hourDiff = Math.floor((now.getTime() - itemDate.getTime()) / (1000 * 60 * 60))
-      if (!timelineBuckets[hourDiff]) {
-        timelineBuckets[hourDiff] = []
+      const dayDiff = Math.floor((now.getTime() - itemDate.getTime()) / (1000 * 60 * 60 * 24))
+      const key = dayDiff === 0 ? 'Today' : dayDiff === 1 ? 'Yesterday' : `${dayDiff}d ago`
+      if (!timelineBuckets[key]) {
+        timelineBuckets[key] = []
       }
-      timelineBuckets[hourDiff].push(item)
+      timelineBuckets[key].push(item)
     }
 
-    // Get the 4 most recent hour buckets
-    const sortedHours = Object.keys(timelineBuckets)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .slice(0, 4)
+    // Get the most recent day buckets (up to 7 days)
+    const dayOrder = ['Today', 'Yesterday', '2d ago', '3d ago', '4d ago', '5d ago', '6d ago']
+    const availableDays = dayOrder.filter(d => timelineBuckets[d] && timelineBuckets[d].length > 0)
+    const timelineDays = availableDays.slice(0, 5)
 
     const timeline = {
-      time: sortedHours.map(h => h === 0 ? 'now' : `${h}h ago`),
-      positive: sortedHours.map(h => {
-        const bucket = timelineBuckets[h] || []
+      time: timelineDays,
+      positive: timelineDays.map(d => {
+        const bucket = timelineBuckets[d] || []
         return bucket.length > 0
           ? Math.round((bucket.filter(i => i.sentiment === 'positive').length / bucket.length) * 100)
           : 0
       }),
-      negative: sortedHours.map(h => {
-        const bucket = timelineBuckets[h] || []
+      negative: timelineDays.map(d => {
+        const bucket = timelineBuckets[d] || []
         return bucket.length > 0
           ? Math.round((bucket.filter(i => i.sentiment === 'negative').length / bucket.length) * 100)
           : 0
       }),
-      neutral: sortedHours.map(h => {
-        const bucket = timelineBuckets[h] || []
+      neutral: timelineDays.map(d => {
+        const bucket = timelineBuckets[d] || []
         return bucket.length > 0
           ? Math.round((bucket.filter(i => i.sentiment === 'neutral').length / bucket.length) * 100)
           : 0
       })
     }
 
-    // Generate AI response
+    // Generate simple AI summary (will be enhanced by chat endpoint)
     const topSources = Object.entries(platformBreakdown)
       .sort((a, b) => b[1] - a[1])
-      .map(([source]) => source)
+      .map(([source, count]) => `${source} (${count})`)
+      .slice(0, 3)
 
-    const aiAnswer = generateAIResponse(
-      query,
-      positivePercentage,
-      negativePercentage,
-      neutralPercentage,
-      total,
-      topSources
-    )
+    const aiAnswer = `Analyzed ${total} items about "${query}" from ${Object.keys(platformBreakdown).length} sources. Sentiment: ${positivePercentage}% positive, ${negativePercentage}% negative, ${neutralPercentage}% neutral. Top sources: ${topSources.join(', ')}.`
 
     const response = {
       total_tweets: total,
@@ -496,7 +525,8 @@ export async function POST(request: NextRequest) {
       source_sentiment_counts: sourceSentimentCounts,
       success: true,
       message: `Analysis complete: ${total} items from ${Object.keys(platformBreakdown).length} sources`,
-      ai_answer: aiAnswer
+      ai_answer: aiAnswer,
+      query: query
     }
 
     console.log(`✅ Analysis complete: ${total} items, ${positivePercentage}% positive`)
