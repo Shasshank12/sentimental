@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart as RechartsBarChart, Bar } from 'recharts'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://twitter-sentiment-dashboard-9ccmxfs3n-shasshank12s-projects.vercel.app'
+// API calls use relative paths - works in both development and production
 
 interface AnalysisResults {
   total_tweets: number
@@ -119,20 +119,23 @@ export default function Dashboard() {
     if (!query.trim()) return
     setIsLoading(true)
     try {
-      // Call backend API only
-      const response = await fetch('http://localhost:8000/api/analyze', {
+      // Call our Next.js API route (relative path works in dev and production)
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, max_tweets: 100, use_real_data: true }),
+        body: JSON.stringify({ query, max_tweets: 100 }),
       })
-      if (!response.ok) throw new Error('Failed to fetch analysis from backend')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Analysis failed with status ${response.status}`)
+      }
       const data = await response.json()
       setAnalysisResults(data)
       setAiAnswer(data.ai_answer || null)
       // Set top 5 diverse data items
       const topItems = selectTopDiverseItems(data.sample_tweets || [], 5).map((item: any, index: number) => ({
         id: `real-item-${index + 1}`,
-        text: item.text || item.content || item.title || `Real ${query} content from ${item.platform || 'unknown source'}`,
+        text: item.text || item.content || item.title || `Content from ${item.platform || 'unknown source'}`,
         sentiment: item.sentiment || 'neutral',
         source: item.source || item.platform || 'unknown',
         timestamp: item.created_at || new Date().toISOString(),
@@ -141,7 +144,7 @@ export default function Dashboard() {
       }))
       setTopDataItems(topItems)
     } catch (error) {
-      console.error('💥 Analysis error:', error)
+      console.error('Analysis error:', error)
       setAnalysisResults({
         total_tweets: 0,
         positive_percentage: 0,
@@ -151,7 +154,7 @@ export default function Dashboard() {
         sample_tweets: [],
         platform_breakdown: {},
         success: false,
-        message: `Analysis failed: ${error}`
+        message: error instanceof Error ? error.message : 'Analysis failed'
       })
       setTopDataItems([])
     } finally {
@@ -235,20 +238,16 @@ export default function Dashboard() {
     setIsChatLoading(true)
 
     try {
-      // Call backend API for enhanced AI response
-      const response = await fetch('http://localhost:8000/api/chat', {
+      // Call our Next.js API route for AI chat
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: chatInput, 
-          analysis_results: analysisResults 
+        body: JSON.stringify({
+          message: chatInput,
+          analysis_results: analysisResults
         }),
       })
-      
-      if (!response.ok) {
-        throw new Error('Failed to get AI response from backend')
-      }
-      
+
       const data = await response.json()
       const aiResponse = data.response || "I'm sorry, I couldn't process your request. Please try again."
       
